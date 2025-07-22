@@ -1,7 +1,6 @@
 import socket
 import struct
 import hashlib
-from sortedcontainers import SortedDict
 
 
 class PythonRX:
@@ -12,7 +11,7 @@ class PythonRX:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.UDP_IP, self.UDP_PORT))
 
-        self.buffer = SortedDict()
+        self.buffer = {}
         self.max_seq = None
         self.file_name = None
         self.tx_id = None

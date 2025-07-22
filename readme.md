@@ -13,7 +13,7 @@ Both implementations are bidirectional, that means, communication between Java T
 - Implements Stop-and-Wait protocol
 - Communication is bidirectional and cross-language
 - Fixed timeout of 10 seconds per data packet
-- No external serial/RXTX libraries required
+- GUI Implementation for Python
 
 ---
 
@@ -28,3 +28,6 @@ TX <file_path> <destination_ip_address>
 ### Receiver (TX)
 
 RX <file_path_to_store>
+
+### GUI
+Execute a program without any arguments.

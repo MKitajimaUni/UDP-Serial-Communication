@@ -1,6 +1,7 @@
 import socket
 import struct
 import hashlib
+import subprocess
 from pathlib import Path
 import random
 import sys
@@ -19,22 +20,24 @@ class PythonTX:
 
     def wait_for_ack(self, expected_seq, packet):
         for _ in range(self.MAX_RETRIES):
-            self.sock.sendto(packet, (self.UDP_IP, self.UDP_PORT))
             try:
+                self.sock.sendto(packet, (self.UDP_IP, self.UDP_PORT))
                 ack_pkt, _ = self.sock.recvfrom(1024)
                 ack_tx_id, ack_seq = struct.unpack('!HI', ack_pkt[:6])
                 if ack_tx_id == self.TX_ID and ack_seq == expected_seq:
                     return True  # ACK received
             except socket.timeout:
                 print(f"Timeout waiting for ACK for seq {expected_seq}, retrying...\r", end='')
-        return False  # Timeout after retries
+            except socket.gaierror:
+                raise OSError
+        raise TimeoutError # Timeout after retries
 
     def send_file(self):
         try:
             data = Path(self.FILENAME).read_bytes()
         except FileNotFoundError:
             print(f"Error: File '{self.FILENAME}' not found")
-            return False
+            raise FileNotFoundError
 
         chunk_size = 512
         chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
