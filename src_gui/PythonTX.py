@@ -18,7 +18,8 @@ class PythonTX:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(self.TIMEOUT)
 
-    def wait_for_ack(self, expected_seq, packet):
+    def wait_for_ack(self, expected_seq, packet, progress_callback):
+        retries = 1
         for _ in range(self.MAX_RETRIES):
             try:
                 self.sock.sendto(packet, (self.UDP_IP, self.UDP_PORT))
@@ -27,12 +28,15 @@ class PythonTX:
                 if ack_tx_id == self.TX_ID and ack_seq == expected_seq:
                     return True
             except socket.timeout:
-                print(f"Timeout waiting for ACK for seq {expected_seq}, retrying...\r", end='')
+                progress = f"Timeout waiting for ACK for seq {expected_seq}, retrying... ({retries}/{self.MAX_RETRIES})"
+                progress_callback(progress)
+                print(f"{progress}\r", end='')
+                retries += 1
             except socket.gaierror:
                 raise OSError("Invalid IP address or host unreachable.")
         raise TimeoutError(f"Timeout waiting for ACK for sequence {expected_seq}")
 
-    def send_file(self):
+    def send_file(self, progress_callback=None):
         try:
             data = Path(self.FILENAME).read_bytes()
         except FileNotFoundError:
@@ -43,25 +47,26 @@ class PythonTX:
 
         file_name_bytes = self.FILENAME.encode()
         first_pkt = struct.pack('!HIII', self.TX_ID, 0, len(chunks), len(file_name_bytes)) + file_name_bytes
-        if not self.wait_for_ack(0, first_pkt):
+        if not self.wait_for_ack(0, first_pkt, progress_callback):
             self.sock.close()
             raise ConnectionError("Failed to initialize transfer.")
 
         current_seq = 1
         while current_seq <= len(chunks):
             data_pkt = struct.pack('!HII', self.TX_ID, current_seq, len(chunks[current_seq - 1])) + chunks[current_seq - 1]
-            if self.wait_for_ack(current_seq, data_pkt):
+            if self.wait_for_ack(current_seq, data_pkt, progress_callback):
+                progress = f"Transfer: {current_seq}/{len(chunks)} packets ({int((current_seq / float(len(chunks))) * 100)}%)"
                 print(
-                    f"\rTransfer: {current_seq}/{len(chunks)} packets "
-                    f"({int((current_seq / float(len(chunks))) * 100)}%)", end='')
+                    f"\r{progress}", end='')
                 current_seq += 1
+                progress_callback(progress)
             else:
                 self.sock.close()
                 raise ConnectionError(f"Failed to send packet {current_seq} after retries.")
 
         md5 = hashlib.md5(data).digest()
         last_pkt = struct.pack('!HI', self.TX_ID, len(chunks) + 1) + md5
-        if self.wait_for_ack(len(chunks) + 1, last_pkt):
+        if self.wait_for_ack(len(chunks) + 1, last_pkt, progress_callback):
             print("\nFile transfer completed successfully.")
             self.sock.close()
             return True

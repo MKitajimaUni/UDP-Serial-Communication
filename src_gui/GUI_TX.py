@@ -29,7 +29,7 @@ def send_file():
             update_loading_message("Sending file. This may take a while...")
 
             tx = PythonTX(dest_ip, filepath)
-            tx.send_file()
+            tx.send_file(progress_callback=update_loading_message)
 
             update_loading_message("Transfer complete.")
             messagebox.showinfo("Success", f"File sent to {dest_ip} successfully.")
